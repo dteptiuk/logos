@@ -1,0 +1,19 @@
+# Dependabot — the GitHub Actions used in .github/workflows. This repo has no
+# other dependencies.
+
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    # Wait 7 days after a release before proposing it: most poisoned or
+    # broken releases are caught by then. Security updates skip the wait.
+    cooldown:
+      default-days: 7
+    # Minor and patch bumps come as one PR.
+    groups:
+      actions-minor-patch:
+        update-types: ["minor", "patch"]

@@ -1,0 +1,5 @@
+# Which rules of the repo standard apply to this repo.
+#
+# archive: kept, not developed. Only four baseline rules apply: protected
+# main, the secret scan in CI, Dependabot, and no leftover branches.
+profiles: [archive]

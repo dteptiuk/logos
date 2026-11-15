@@ -1,0 +1,60 @@
+# CI — on every push to main and every PR. The last job, `ci`, is the only
+# check main's ruleset requires: it is green only when every job before it is.
+#
+#   secrets   no password or key is committed (gitleaks, every tracked file)
+#   ci        the summary of the above
+#
+# This repo holds image files only, so there is nothing to test, lint, build
+# or audit.
+#
+# Actions are pinned to a full commit hash (Dependabot keeps them current);
+# the gitleaks image is pinned by digest and bumped by hand.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# Read-only for every job. Nothing here pushes, comments or deploys.
+permissions:
+  contents: read
+
+jobs:
+  secrets:
+    name: Secret scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7
+        with:
+          persist-credentials: false   # this job never pushes; keep no token
+
+      # Every tracked file, as checked out (not the history). Output is
+      # redacted so a real find never lands in the log.
+      - name: gitleaks
+        run: >-
+          docker run --rm -v "$PWD":/repo:ro -w /repo
+          ghcr.io/gitleaks/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f
+          dir . --redact --no-banner
+
+  # The one check main's ruleset requires. `if: always()` because a job whose
+  # dependency failed is otherwise skipped, and GitHub counts a skipped
+  # required check as passed.
+  ci:
+    name: ci
+    if: always()
+    needs: [secrets]
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Every job passed
+        uses: re-actors/alls-green@b5b5b37504aa4183270bd3d855c52a67f212be35  # v1.3.0
+        with:
+          jobs: ${{ toJSON(needs) }}

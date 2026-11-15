@@ -1,0 +1,50 @@
+# Dependabot auto-merge — turns on GitHub's auto-merge for Dependabot PRs, so
+# they squash-merge by themselves once the required `ci` check is green.
+#
+# Dependabot only watches the CI actions here (see dependabot.yml), so this
+# only ever merges an action update.
+
+name: Dependabot auto-merge
+
+on: pull_request
+
+# Read-only by default; the one job below asks for what it needs.
+permissions:
+  contents: read
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+    # The pull request's author, not whoever triggered the latest event.
+    if: github.event.pull_request.user.login == 'dependabot[bot]'
+    # contents: write — GitHub requires it to enable auto-merge on a PR.
+    # pull-requests: write — to enable auto-merge and to leave the comment.
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Fetch Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98  # v3
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      # A named value only, so anything else waits for a person.
+      - name: Enable auto-merge (squash)
+        id: automerge
+        if: steps.metadata.outputs.package-ecosystem == 'github_actions'
+        run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # When the merge step was skipped. Only when the PR is opened, so a
+      # rebase does not repeat the comment.
+      - name: Say why this one waits
+        if: github.event.action == 'opened' && steps.automerge.outcome == 'skipped'
+        run: >-
+          gh pr comment "$PR_URL" --body
+          "Not auto-merged: this is not a CI action update. It waits for a person."
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
